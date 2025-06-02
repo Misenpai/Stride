@@ -126,11 +126,10 @@ async function handleAdd(interaction, userId, guildId) {
       });
     }
 
-    // Get existing channels and add new ones
     const existingChannels = getUserChannels(userId, guildId) || [];
     console.log(`Existing channels: ${existingChannels}`);
     
-    const newChannels = [...new Set([...existingChannels, ...channels])]; // Remove duplicates
+    const newChannels = [...new Set([...existingChannels, ...channels])];
     console.log(`New channels list: ${newChannels}`);
     
     setUserChannels(userId, guildId, newChannels);

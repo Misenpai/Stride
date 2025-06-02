@@ -4,6 +4,7 @@ import {
   unlockUserInChannels,
   setClientInstance,
 } from "./channelLocker.js";
+import { getUserChannels } from "./userConfig.js";
 
 const sessions = new Map();
 let clientInstance = null;
@@ -74,5 +75,13 @@ export function getPomodoroRemaining(userId) {
 }
 
 export async function lockChannelsForUser(guild, userId) {
-  await lockUserOutOfChannels(guild, userId, LOCKED_CHANNELS);
+  const userChannels = getUserChannels(userId, guild.id);
+
+  if (!userChannels || userChannels.length === 0) {
+    throw new Error(
+      "No channels configured for locking. Use `/focus-config add` to set up your channels first."
+    );
+  }
+
+  await lockUserOutOfChannels(guild, userId, userChannels);
 }

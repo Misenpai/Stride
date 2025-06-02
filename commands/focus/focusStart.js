@@ -34,16 +34,24 @@ export async function execute(interaction) {
     });
   }
 
-  await lockChannelsForUser(interaction.guild, userId);
-  const endTime = Date.now() + minutes * 60 * 1000;
-  beginSession(userId, endTime);
+  try {
+    await lockChannelsForUser(interaction.guild, userId);
+    const endTime = Date.now() + minutes * 60 * 1000;
+    beginSession(userId, endTime);
 
-  const embed = new EmbedBuilder()
-    .setTitle("🔒 Focus Session Started")
-    .setDescription(
-      `I've locked the channels for ${minutes} minutes. Stay focused!`
-    )
-    .setColor(0x0099ff)
-    .setTimestamp();
-  await interaction.reply({ embeds: [embed] });
+    const embed = new EmbedBuilder()
+      .setTitle("🔒 Focus Session Started")
+      .setDescription(
+        `I've locked your configured channels for ${minutes} minutes. Stay focused!`
+      )
+      .setColor(0x0099ff)
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed] });
+  } catch (error) {
+    return interaction.reply({
+      content: error.message,
+      flags: 64,
+    });
+  }
 }

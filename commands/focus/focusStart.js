@@ -17,7 +17,7 @@ export const data = new SlashCommandBuilder()
   .addIntegerOption((option) =>
     option
       .setName("minutes")
-      .setDescription("Length of the focus session (default: 25")
+      .setDescription("Length of the focus session (default: 25)")
       .setRequired(false)
   );
 
@@ -30,7 +30,7 @@ export async function execute(interaction) {
     return interaction.reply({
       content:
         "You already have an active focus session. Use `/focus-stop` to cancel",
-      emphemeral: true,
+      flags: 64,
     });
   }
 
@@ -41,7 +41,7 @@ export async function execute(interaction) {
   const embed = new EmbedBuilder()
     .setTitle("🔒 Focus Session Started")
     .setDescription(
-      `I’ve locked the channels for ${minutes} minutes. Stay focused!`
+      `I've locked the channels for ${minutes} minutes. Stay focused!`
     )
     .setColor(0x0099ff)
     .setTimestamp();

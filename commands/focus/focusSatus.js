@@ -1,4 +1,3 @@
-
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import { getPomodoroRemaining } from "../../utils/pomodoroManager.js";
 
@@ -12,8 +11,8 @@ export async function execute(interaction) {
 
   if (remainingMs === null) {
     return interaction.reply({
-      content: "You don’t have an active focus session right now.",
-      ephemeral: true,
+      content: "You don't have an active focus session right now.",
+      flags: 64, // MessageFlags.Ephemeral
     });
   }
 
@@ -26,5 +25,5 @@ export async function execute(interaction) {
     .setColor(0x00ff00)
     .setTimestamp();
 
-  return interaction.reply({ embeds: [embed], ephemeral: true });
+  return interaction.reply({ embeds: [embed], flags: 64 }); // MessageFlags.Ephemeral
 }

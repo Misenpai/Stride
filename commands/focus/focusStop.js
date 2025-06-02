@@ -11,8 +11,8 @@ export async function execute(interaction) {
   const session = stopPomodoro(userId);
   if (!session) {
     return interaction.reply({
-      content: "You don’t have an active focus session to stop.",
-      ephemeral: true,
+      content: "You don't have an active focus session to stop.",
+      flags: 64, // MessageFlags.Ephemeral
     });
   }
 

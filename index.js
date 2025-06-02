@@ -3,6 +3,7 @@ import "dotenv/config";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { setClient } from "./utils/pomodoroManager.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,5 +53,9 @@ for (const file of eventFiles) {
     );
   }
 }
+
+client.once("ready", () => {
+  setClient(client);
+});
 
 client.login(process.env.DISCORD_TOKEN);

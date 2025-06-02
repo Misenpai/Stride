@@ -2,9 +2,16 @@ import { LOCKED_CHANNELS } from "../config.js";
 import {
   lockUserOutOfChannels,
   unlockUserInChannels,
+  setClientInstance,
 } from "./channelLocker.js";
 
 const sessions = new Map();
+let clientInstance = null;
+
+export function setClient(client) {
+  clientInstance = client;
+  setClientInstance(client);
+}
 
 export function checkActive(userId) {
   return sessions.has(userId);
@@ -27,11 +34,19 @@ export function beginSession(userId, endTimestamp) {
   };
 
   const onComplete = async () => {
-    const client = require("discord.js").Client.instance;
-    const user = await client.users.fetch(userId);
-    user.send(
-      `🎉 Congrats! Your focus session has ended. Time to take a break!`
-    );
+    if (!clientInstance) {
+      console.error("Client instance not available");
+      return;
+    }
+
+    try {
+      const user = await clientInstance.users.fetch(userId);
+      await user.send(
+        `🎉 Congrats! Your focus session has ended. Time to take a break!`
+      );
+    } catch (error) {
+      console.error("Error sending completion message:", error);
+    }
   };
 
   sessions.set(userId, {

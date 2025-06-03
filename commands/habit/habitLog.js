@@ -35,7 +35,6 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
-    // Handle autocomplete
     if (interaction.isAutocomplete()) {
       const focusedValue = interaction.options.getFocused();
       const userId = interaction.user.id;
@@ -50,11 +49,11 @@ export async function execute(interaction) {
         .filter((habit) =>
           habit.name.toLowerCase().includes(focusedValue.toLowerCase())
         )
-        .slice(0, 25); // Discord limit
+        .slice(0, 25);
 
       const choices = filtered.map((habit) => ({
         name: `${habit.emoji} ${habit.name}`,
-        value: habit.id,
+        value: habit.name,
       }));
 
       return await interaction.respond(choices);
@@ -71,12 +70,11 @@ export async function execute(interaction) {
       });
     }
 
-    const habitId = interaction.options.getString("habit");
+    const habitName = interaction.options.getString("habit");
     const count = interaction.options.getInteger("count") || 1;
     const dateStr = interaction.options.getString("date");
     const notes = interaction.options.getString("notes") || "";
 
-    // Validate date if provided
     let logDate = new Date();
     if (dateStr) {
       const parsedDate = new Date(dateStr + "T00:00:00");
@@ -90,7 +88,9 @@ export async function execute(interaction) {
     }
 
     const habits = getUserHabits(userId, guildId);
-    const habit = habits.find((h) => h.id === habitId);
+    const habit = habits.find(
+      (h) => h.name.toLowerCase() === habitName.toLowerCase()
+    );
 
     if (!habit) {
       return await interaction.editReply({
@@ -99,7 +99,6 @@ export async function execute(interaction) {
       });
     }
 
-    // Check if already logged for this date
     const dateString = logDate.toISOString().split("T")[0];
     const alreadyLogged = habit.completions.some(
       (completion) => completion.date === dateString
@@ -111,7 +110,7 @@ export async function execute(interaction) {
       });
     }
 
-    const result = logHabitCompletion(userId, guildId, habitId, {
+    const result = logHabitCompletion(userId, guildId, habitName, {
       date: dateString,
       count,
       notes,
@@ -128,7 +127,6 @@ export async function execute(interaction) {
     const updatedHabit = result.habit;
     const streakInfo = result.streakInfo;
 
-    // Create celebration message based on milestones
     let celebrationMessage = "";
     if (streakInfo.isNewRecord) {
       celebrationMessage = `🎉 **NEW RECORD!** You've reached your longest streak ever!`;
@@ -183,7 +181,6 @@ export async function execute(interaction) {
       });
     }
 
-    // Add streak status
     if (streakInfo.streakBroken) {
       embed.addFields({
         name: "⚠️ Streak Status",
@@ -195,9 +192,7 @@ export async function execute(interaction) {
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error("Error in habit-log command:", error);
-
     const errorMessage = `There was an error logging your habit: ${error.message}`;
-
     try {
       if (interaction.deferred) {
         await interaction.editReply({ content: errorMessage });

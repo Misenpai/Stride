@@ -22,7 +22,6 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
-    // Handle autocomplete
     if (interaction.isAutocomplete()) {
       const focusedValue = interaction.options.getFocused();
       const userId = interaction.user.id;
@@ -41,7 +40,7 @@ export async function execute(interaction) {
 
       const choices = filtered.map((habit) => ({
         name: `${habit.emoji} ${habit.name}`,
-        value: habit.id,
+        value: habit.name,
       }));
 
       return await interaction.respond(choices);
@@ -58,11 +57,13 @@ export async function execute(interaction) {
       });
     }
 
-    const habitId = interaction.options.getString("habit");
+    const habitName = interaction.options.getString("habit");
     const days = interaction.options.getInteger("days") || 7;
 
     const habits = getUserHabits(userId, guildId);
-    const habit = habits.find((h) => h.id === habitId);
+    const habit = habits.find(
+      (h) => h.name.toLowerCase() === habitName.toLowerCase()
+    );
 
     if (!habit) {
       return await interaction.editReply({
@@ -71,7 +72,6 @@ export async function execute(interaction) {
       });
     }
 
-    // Calculate statistics
     const totalDays = Math.ceil(
       (new Date() - new Date(habit.createdAt)) / (1000 * 60 * 60 * 24)
     );
@@ -80,7 +80,6 @@ export async function execute(interaction) {
         ? Math.round((habit.totalCompletions / totalDays) * 100)
         : 0;
 
-    // Get recent completions
     const recentDays = [];
     const today = new Date();
 
@@ -98,10 +97,8 @@ export async function execute(interaction) {
       });
     }
 
-    // Create visual calendar
     const calendar = createCalendar(recentDays, habit.target);
 
-    // Calculate current month statistics
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     const monthlyCompletions = habit.completions.filter((c) => {
@@ -143,7 +140,6 @@ export async function execute(interaction) {
       .setColor(habit.streak > 0 ? 0x00ff00 : 0x999999)
       .setTimestamp();
 
-    // Add last completion info
     if (habit.lastCompleted) {
       const lastCompletion = habit.completions[habit.completions.length - 1];
       embed.addFields({
@@ -156,7 +152,6 @@ export async function execute(interaction) {
       });
     }
 
-    // Add motivational message based on streak
     let motivationMessage = "";
     if (habit.streak === 0) {
       motivationMessage =
@@ -178,9 +173,7 @@ export async function execute(interaction) {
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error("Error in habit-status command:", error);
-
     const errorMessage = `There was an error fetching habit status: ${error.message}`;
-
     try {
       if (interaction.deferred) {
         await interaction.editReply({ content: errorMessage });
@@ -204,9 +197,9 @@ function createCalendar(days, target) {
 
   const completionSymbols = days
     .map((d) => {
-      if (!d.completed) return "⭕"; // Not completed
-      if (d.count >= target) return "✅"; // Target met
-      return "🟡"; // Partial completion
+      if (!d.completed) return "⭕";
+      if (d.count >= target) return "✅";
+      return "🟡";
     })
     .join("  ");
 

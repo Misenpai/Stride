@@ -3,17 +3,17 @@ import { getAllUsersHabits } from "../../utils/habitManager.js";
 
 export const data = new SlashCommandBuilder()
   .setName("habit-leaderboard")
-  .setDescription("View the server's habit tracking leaderboard")
+  .setDescription("View the habit leaderboard for this server")
   .addStringOption((option) =>
     option
       .setName("category")
-      .setDescription("What to rank by")
+      .setDescription("Leaderboard category to display")
       .setRequired(false)
       .addChoices(
-        { name: "Current Streaks", value: "streak" },
-        { name: "Longest Streaks", value: "longest" },
+        { name: "Current Streak", value: "streak" },
+        { name: "Longest Streak", value: "longest" },
         { name: "Total Completions", value: "completions" },
-        { name: "Active Habits", value: "habits" }
+        { name: "Number of Habits", value: "habits" }
       )
   )
   .addIntegerOption((option) =>
@@ -30,162 +30,138 @@ export async function execute(interaction) {
     await interaction.deferReply();
 
     const guildId = interaction.guild?.id;
-    const category = interaction.options.getString("category") || "streak";
-    const limit = interaction.options.getInteger("limit") || 10;
-
     if (!guildId) {
       return await interaction.editReply({
         content: "This command can only be used in a server.",
       });
     }
 
-    const allUsersHabits = getAllUsersHabits(guildId);
+    const category = interaction.options.getString("category") || "streak";
+    const limit = interaction.options.getInteger("limit") || 10;
 
-    if (!allUsersHabits || Object.keys(allUsersHabits).length === 0) {
+    const allHabits = getAllUsersHabits(guildId);
+    if (!allHabits || Object.keys(allHabits).length === 0) {
       return await interaction.editReply({
-        content:
-          "No habit data found for this server. Start tracking habits with `/habit-create`!",
+        content: "No habits have been created in this server yet.",
       });
     }
 
-    // Calculate user statistics
-    const userStats = [];
+    const leaderboard = [];
+    let totalHabits = 0;
+    let totalUsers = 0;
+    let totalCompletions = 0;
+    let totalActiveStreaks = 0;
 
-    for (const [userId, habits] of Object.entries(allUsersHabits)) {
-      if (!habits || habits.length === 0) continue;
+    for (const [userId, habits] of Object.entries(allHabits)) {
+      if (!Array.isArray(habits) || habits.length === 0) continue;
+
+      totalUsers++;
+      totalHabits += habits.length;
 
       let totalStreak = 0;
       let longestStreak = 0;
-      let totalCompletions = 0;
+      let totalCompletionsUser = 0;
       let activeHabits = habits.length;
 
-      habits.forEach((habit) => {
+      for (const habit of habits) {
         totalStreak += habit.streak;
         longestStreak = Math.max(longestStreak, habit.longestStreak);
+        totalCompletionsUser += habit.totalCompletions;
+        if (habit.streak > 0) totalActiveStreaks++;
         totalCompletions += habit.totalCompletions;
-      });
+      }
 
-      userStats.push({
+      leaderboard.push({
         userId,
         totalStreak,
         longestStreak,
-        totalCompletions,
+        totalCompletions: totalCompletionsUser,
         activeHabits,
-        averageStreak: Math.round(totalStreak / activeHabits),
       });
     }
 
-    if (userStats.length === 0) {
-      return await interaction.editReply({
-        content: "No users with habit data found in this server.",
-      });
-    }
+    let sortedLeaderboard;
+    let fieldName;
 
-    // Sort based on category
-    let sortField, title, description;
     switch (category) {
       case "streak":
-        userStats.sort((a, b) => b.totalStreak - a.totalStreak);
-        title = "🔥 Current Streak Leaders";
-        description = "Users with the highest combined current streaks";
-        sortField = "totalStreak";
+        sortedLeaderboard = leaderboard.sort(
+          (a, b) => b.totalStreak - a.totalStreak
+        );
+        fieldName = "Total Current Streak";
         break;
       case "longest":
-        userStats.sort((a, b) => b.longestStreak - a.longestStreak);
-        title = "🏆 Longest Streak Champions";
-        description = "Users with the longest single habit streaks";
-        sortField = "longestStreak";
+        sortedLeaderboard = leaderboard.sort(
+          (a, b) => b.longestStreak - a.longestStreak
+        );
+        fieldName = "Longest Streak";
         break;
       case "completions":
-        userStats.sort((a, b) => b.totalCompletions - a.totalCompletions);
-        title = "📊 Total Completion Leaders";
-        description = "Users with the most habit completions";
-        sortField = "totalCompletions";
+        sortedLeaderboard = leaderboard.sort(
+          (a, b) => b.totalCompletions - a.totalCompletions
+        );
+        fieldName = "Total Completions";
         break;
       case "habits":
-        userStats.sort((a, b) => b.activeHabits - a.activeHabits);
-        title = "🎯 Most Active Trackers";
-        description = "Users tracking the most habits";
-        sortField = "activeHabits";
+        sortedLeaderboard = leaderboard.sort(
+          (a, b) => b.activeHabits - a.activeHabits
+        );
+        fieldName = "Active Habits";
         break;
+      default:
+        sortedLeaderboard = leaderboard.sort(
+          (a, b) => b.totalStreak - a.totalStreak
+        );
+        fieldName = "Total Current Streak";
     }
 
-    const topUsers = userStats.slice(0, limit);
+    sortedLeaderboard = sortedLeaderboard.slice(0, limit);
 
-    // Build leaderboard
-    let leaderboard = "";
-    const medals = ["🥇", "🥈", "🥉"];
+    let leaderboardText = "";
+    for (let i = 0; i < sortedLeaderboard.length; i++) {
+      const entry = sortedLeaderboard[i];
+      const value = entry[category] || entry.totalStreak;
+      const position = i < 3 ? ["🥇", "🥈", "🥉"][i] : `#${i + 1}`;
+      leaderboardText += `${position} <@${entry.userId}> - ${value} (${
+        entry.activeHabits
+      } habit${entry.activeHabits !== 1 ? "s" : ""})\n`;
+    }
 
-    for (let i = 0; i < topUsers.length; i++) {
-      const user = topUsers[i];
-      const medal = i < 3 ? medals[i] : `${i + 1}.`;
-
-      try {
-        const discordUser = await interaction.client.users.fetch(user.userId);
-        const username = discordUser.username;
-
-        let statText = "";
-        switch (category) {
-          case "streak":
-            statText = `${user.totalStreak} days (${user.activeHabits} habits)`;
-            break;
-          case "longest":
-            statText = `${user.longestStreak} days`;
-            break;
-          case "completions":
-            statText = `${user.totalCompletions} completions`;
-            break;
-          case "habits":
-            statText = `${user.activeHabits} habits (avg: ${user.averageStreak} days)`;
-            break;
-        }
-
-        leaderboard += `${medal} **${username}** - ${statText}\n`;
-      } catch (error) {
-        // User not found or error fetching
-        leaderboard += `${medal} *Unknown User* - ${user[sortField]}\n`;
-      }
+    if (!leaderboardText) {
+      leaderboardText = "No data available for this category.";
     }
 
     const embed = new EmbedBuilder()
-      .setTitle(title)
-      .setDescription(description)
-      .addFields({
-        name: "🏅 Leaderboard",
-        value: leaderboard || "No data available",
-        inline: false,
-      })
-      .setColor(0xffd700)
-      .setFooter({
-        text: `Showing top ${topUsers.length} of ${userStats.length} users`,
-      })
-      .setTimestamp();
-
-    // Add server statistics
-    const totalUsers = userStats.length;
-    const totalHabits = userStats.reduce((sum, u) => sum + u.activeHabits, 0);
-    const totalCompletions = userStats.reduce(
-      (sum, u) => sum + u.totalCompletions,
-      0
-    );
-    const averageHabitsPerUser = Math.round(totalHabits / totalUsers);
-
-    embed.addFields({
-      name: "📈 Server Stats",
-      value:
-        `**Active Users:** ${totalUsers}\n` +
-        `**Total Habits:** ${totalHabits}\n` +
-        `**Total Completions:** ${totalCompletions}\n` +
-        `**Avg. Habits/User:** ${averageHabitsPerUser}`,
-      inline: true,
-    });
+      .setTitle(
+        `🏆 Habit Leaderboard - ${
+          category.charAt(0).toUpperCase() + category.slice(1)
+        }`
+      )
+      .setDescription("Top habit trackers in this server!")
+      .addFields(
+        {
+          name: fieldName,
+          value: leaderboardText,
+          inline: false,
+        },
+        {
+          name: "Server Stats",
+          value:
+            `**Total Users:** ${totalUsers}\n` +
+            `**Total Habits:** ${totalHabits}\n` +
+            `**Total Completions:** ${totalCompletions}\n` +
+            `**Active Streaks:** ${totalActiveStreaks}`,
+          inline: true,
+        }
+      )
+      .setColor(0x00ff00)
+      .setTimestamp()
+      .setFooter({ text: "Keep up those habits!" });
 
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error("Error in habit-leaderboard command:", error);
-
-    const errorMessage = `There was an error fetching the leaderboard: ${error.message}`;
-
+    const errorMessage = `There was an error generating the leaderboard: ${error.message}`;
     try {
       if (interaction.deferred) {
         await interaction.editReply({ content: errorMessage });

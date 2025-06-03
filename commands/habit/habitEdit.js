@@ -48,7 +48,6 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
-    // Handle autocomplete
     if (interaction.isAutocomplete()) {
       const focusedValue = interaction.options.getFocused();
       const userId = interaction.user.id;
@@ -67,7 +66,7 @@ export async function execute(interaction) {
 
       const choices = filtered.map((habit) => ({
         name: `${habit.emoji} ${habit.name}`,
-        value: habit.id,
+        value: habit.name,
       }));
 
       return await interaction.respond(choices);
@@ -84,12 +83,14 @@ export async function execute(interaction) {
       });
     }
 
-    const habitId = interaction.options.getString("habit");
+    const habitName = interaction.options.getString("habit");
     const action = interaction.options.getString("action");
     const dateStr = interaction.options.getString("date");
 
     const habits = getUserHabits(userId, guildId);
-    const habit = habits.find((h) => h.id === habitId);
+    const habit = habits.find(
+      (h) => h.name.toLowerCase() === habitName.toLowerCase()
+    );
 
     if (!habit) {
       return await interaction.editReply({
@@ -113,9 +114,7 @@ export async function execute(interaction) {
     }
   } catch (error) {
     console.error("Error in habit-edit command:", error);
-
     const errorMessage = `There was an error editing your habit: ${error.message}`;
-
     try {
       if (interaction.deferred) {
         await interaction.editReply({ content: errorMessage });
@@ -133,7 +132,7 @@ export async function execute(interaction) {
 
 async function handleEditDetails(interaction, habit, userId, guildId) {
   const modal = new ModalBuilder()
-    .setCustomId(`edit_habit_${habit.id}`)
+    .setCustomId(`edit_habit_${habit.name}`)
     .setTitle(`Edit: ${habit.name}`);
 
   const nameInput = new TextInputBuilder()
@@ -177,12 +176,11 @@ async function handleEditDetails(interaction, habit, userId, guildId) {
 
   await interaction.showModal(modal);
 
-  // Wait for modal submission
   try {
     const modalInteraction = await interaction.awaitModalSubmit({
-      time: 300000, // 5 minutes
+      time: 300000,
       filter: (i) =>
-        i.user.id === userId && i.customId === `edit_habit_${habit.id}`,
+        i.user.id === userId && i.customId === `edit_habit_${habit.name}`,
     });
 
     const newName = modalInteraction.fields.getTextInputValue("habit_name");
@@ -194,7 +192,6 @@ async function handleEditDetails(interaction, habit, userId, guildId) {
     const newEmoji =
       modalInteraction.fields.getTextInputValue("habit_emoji") || "✅";
 
-    // Validate target
     if (isNaN(newTarget) || newTarget < 1 || newTarget > 100) {
       await modalInteraction.reply({
         content: "Daily target must be a number between 1 and 100.",
@@ -203,10 +200,12 @@ async function handleEditDetails(interaction, habit, userId, guildId) {
       return;
     }
 
-    // Check for duplicate names (excluding current habit)
     const existingHabits = getUserHabits(userId, guildId);
-    const duplicateHabit = existingHabits.find(
-      (h) => h.id !== habit.id && h.name.toLowerCase() === newName.toLowerCase()
+    const otherHabits = existingHabits.filter(
+      (h) => h.name.toLowerCase() !== habit.name.toLowerCase()
+    );
+    const duplicateHabit = otherHabits.find(
+      (h) => h.name.toLowerCase() === newName.toLowerCase()
     );
 
     if (duplicateHabit) {
@@ -226,7 +225,7 @@ async function handleEditDetails(interaction, habit, userId, guildId) {
       updatedAt: new Date().toISOString(),
     };
 
-    const success = updateHabit(userId, guildId, habit.id, updatedHabit);
+    const success = updateHabit(userId, guildId, habit.name, updatedHabit);
 
     if (!success) {
       await modalInteraction.reply({
@@ -262,7 +261,6 @@ async function handleEditDetails(interaction, habit, userId, guildId) {
     await modalInteraction.reply({ embeds: [embed], ephemeral: true });
   } catch (error) {
     if (error.code === "InteractionCollectorError") {
-      // Timeout - edit the original response since we can't show the modal again
       await interaction.editReply({
         content: "Edit timeout. Please try the command again.",
       });
@@ -287,7 +285,6 @@ async function handleEditCompletion(
     return;
   }
 
-  // Validate date
   const parsedDate = new Date(dateStr + "T00:00:00");
   if (isNaN(parsedDate.getTime())) {
     await interaction.editReply({
@@ -305,7 +302,7 @@ async function handleEditCompletion(
   }
 
   const modal = new ModalBuilder()
-    .setCustomId(`edit_completion_${habit.id}_${dateStr}`)
+    .setCustomId(`edit_completion_${habit.name}_${dateStr}`)
     .setTitle(`Edit Completion: ${habit.name}`);
 
   const countInput = new TextInputBuilder()
@@ -333,10 +330,10 @@ async function handleEditCompletion(
 
   try {
     const modalInteraction = await interaction.awaitModalSubmit({
-      time: 300000, // 5 minutes
+      time: 300000,
       filter: (i) =>
         i.user.id === userId &&
-        i.customId === `edit_completion_${habit.id}_${dateStr}`,
+        i.customId === `edit_completion_${habit.name}_${dateStr}`,
     });
 
     const newCount = parseInt(
@@ -353,7 +350,6 @@ async function handleEditCompletion(
       return;
     }
 
-    // Update the completion entry
     const updatedCompletion = {
       ...completion,
       count: newCount,
@@ -366,13 +362,12 @@ async function handleEditCompletion(
     );
     habit.completions[completionIndex] = updatedCompletion;
 
-    // Recalculate total completions
     habit.totalCompletions = habit.completions.reduce(
       (sum, c) => sum + c.count,
       0
     );
 
-    const success = updateHabit(userId, guildId, habit.id, habit);
+    const success = updateHabit(userId, guildId, habit.name, habit);
 
     if (!success) {
       await modalInteraction.reply({
@@ -442,7 +437,6 @@ async function handleDeleteCompletion(
     return;
   }
 
-  // Create confirmation embed
   const confirmEmbed = new EmbedBuilder()
     .setTitle("⚠️ Confirm Completion Deletion")
     .setDescription(
@@ -456,13 +450,13 @@ async function handleDeleteCompletion(
     .setTimestamp();
 
   const confirmButton = new ButtonBuilder()
-    .setCustomId(`delete_completion_confirm_${habit.id}_${dateStr}`)
+    .setCustomId(`delete_completion_confirm_${habit.name}_${dateStr}`)
     .setLabel("Yes, Delete Entry")
     .setStyle(ButtonStyle.Danger)
     .setEmoji("🗑️");
 
   const cancelButton = new ButtonBuilder()
-    .setCustomId(`delete_completion_cancel_${habit.id}_${dateStr}`)
+    .setCustomId(`delete_completion_cancel_${habit.name}_${dateStr}`)
     .setLabel("Cancel")
     .setStyle(ButtonStyle.Secondary)
     .setEmoji("❌");
@@ -482,7 +476,12 @@ async function handleDeleteCompletion(
     });
 
     if (buttonInteraction.customId.startsWith("delete_completion_confirm")) {
-      const success = deleteHabitCompletion(userId, guildId, habit.id, dateStr);
+      const success = deleteHabitCompletion(
+        userId,
+        guildId,
+        habit.name,
+        dateStr
+      );
 
       if (!success) {
         await buttonInteraction.update({

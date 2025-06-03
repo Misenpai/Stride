@@ -38,7 +38,6 @@ export async function execute(interaction) {
       });
     }
 
-    // Check if user has permission to send reminders (optional: add role check)
     const member = interaction.member;
     const hasPermission =
       member.permissions.has("ManageMessages") ||
@@ -64,13 +63,11 @@ export async function execute(interaction) {
     let failedCount = 0;
 
     if (isPublic) {
-      // Send public reminder in current channel
       const embed = createPublicReminderEmbed(reminders, reminderType);
       await interaction.editReply({ embeds: [embed] });
       return;
     }
 
-    // Send individual DM reminders
     for (const reminder of reminders) {
       try {
         const user = await interaction.client.users.fetch(reminder.userId);
@@ -104,9 +101,7 @@ export async function execute(interaction) {
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error("Error in habit-reminder command:", error);
-
     const errorMessage = `There was an error sending reminders: ${error.message}`;
-
     try {
       if (interaction.deferred) {
         await interaction.editReply({ content: errorMessage });
@@ -157,7 +152,6 @@ function createPersonalReminderEmbed(reminder, type) {
 }
 
 function createPublicReminderEmbed(reminders, type) {
-  // Group reminders by user
   const userReminders = {};
 
   for (const reminder of reminders) {
@@ -277,10 +271,10 @@ function getReminderMessages(type, timeOfDay) {
 }
 
 function getColorForStreak(streak) {
-  if (streak >= 30) return 0x8b00ff; // Purple for 30+ days
-  if (streak >= 14) return 0xff6b00; // Orange for 2+ weeks
-  if (streak >= 7) return 0x00ff00; // Green for 1+ week
-  if (streak >= 3) return 0x00bfff; // Blue for 3+ days
-  if (streak >= 1) return 0xffff00; // Yellow for 1+ days
-  return 0x999999; // Gray for no streak
+  if (streak >= 30) return 0x8b00ff;
+  if (streak >= 14) return 0xff6b00;
+  if (streak >= 7) return 0x00ff00;
+  if (streak >= 3) return 0x00bfff;
+  if (streak >= 1) return 0xffff00;
+  return 0x999999;
 }

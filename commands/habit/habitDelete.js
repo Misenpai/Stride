@@ -22,7 +22,6 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
-    // Handle autocomplete
     if (interaction.isAutocomplete()) {
       const focusedValue = interaction.options.getFocused();
       const userId = interaction.user.id;
@@ -41,7 +40,7 @@ export async function execute(interaction) {
 
       const choices = filtered.map((habit) => ({
         name: `${habit.emoji} ${habit.name}`,
-        value: habit.id,
+        value: habit.name,
       }));
 
       return await interaction.respond(choices);
@@ -58,9 +57,11 @@ export async function execute(interaction) {
       });
     }
 
-    const habitId = interaction.options.getString("habit");
+    const habitName = interaction.options.getString("habit");
     const habits = getUserHabits(userId, guildId);
-    const habit = habits.find((h) => h.id === habitId);
+    const habit = habits.find(
+      (h) => h.name.toLowerCase() === habitName.toLowerCase()
+    );
 
     if (!habit) {
       return await interaction.editReply({
@@ -69,7 +70,6 @@ export async function execute(interaction) {
       });
     }
 
-    // Create confirmation embed
     const confirmEmbed = new EmbedBuilder()
       .setTitle("⚠️ Confirm Habit Deletion")
       .setDescription(
@@ -84,15 +84,14 @@ export async function execute(interaction) {
       .setColor(0xff0000)
       .setTimestamp();
 
-    // Create confirmation buttons
     const confirmButton = new ButtonBuilder()
-      .setCustomId(`delete_habit_confirm_${habitId}`)
+      .setCustomId(`delete_habit_confirm_${habitName}`)
       .setLabel("Yes, Delete Habit")
       .setStyle(ButtonStyle.Danger)
       .setEmoji("🗑️");
 
     const cancelButton = new ButtonBuilder()
-      .setCustomId(`delete_habit_cancel_${habitId}`)
+      .setCustomId(`delete_habit_cancel_${habitName}`)
       .setLabel("Cancel")
       .setStyle(ButtonStyle.Secondary)
       .setEmoji("❌");
@@ -107,17 +106,15 @@ export async function execute(interaction) {
       components: [row],
     });
 
-    // Wait for button interaction
     try {
       const buttonInteraction = await response.awaitMessageComponent({
         componentType: ComponentType.Button,
-        time: 30000, // 30 seconds timeout
+        time: 30000,
         filter: (i) => i.user.id === userId,
       });
 
       if (buttonInteraction.customId.startsWith("delete_habit_confirm")) {
-        // Delete the habit
-        const success = deleteHabit(userId, guildId, habitId);
+        const success = deleteHabit(userId, guildId, habitName);
 
         if (!success) {
           await buttonInteraction.update({
@@ -156,7 +153,6 @@ export async function execute(interaction) {
         });
       }
     } catch (error) {
-      // Timeout or other error
       if (error.code === "InteractionCollectorError") {
         const timeoutEmbed = new EmbedBuilder()
           .setTitle("⏰ Confirmation Timeout")
@@ -174,9 +170,7 @@ export async function execute(interaction) {
     }
   } catch (error) {
     console.error("Error in habit-delete command:", error);
-
     const errorMessage = `There was an error deleting your habit: ${error.message}`;
-
     try {
       if (interaction.deferred) {
         await interaction.editReply({

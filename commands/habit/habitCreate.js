@@ -66,7 +66,6 @@ export async function execute(interaction) {
     const target = interaction.options.getInteger("target") || 1;
     const emoji = interaction.options.getString("emoji") || "✅";
 
-    // Check if user already has this habit
     const existingHabits = getUserHabits(userId, guildId);
     const duplicateHabit = existingHabits.find(
       (habit) => habit.name.toLowerCase() === name.toLowerCase()
@@ -78,7 +77,6 @@ export async function execute(interaction) {
       });
     }
 
-    // Check habit limit (max 10 habits per user)
     if (existingHabits.length >= 10) {
       return await interaction.editReply({
         content:
@@ -87,7 +85,6 @@ export async function execute(interaction) {
     }
 
     const habit = {
-      id: Date.now().toString(),
       name,
       description,
       frequency,
@@ -98,7 +95,7 @@ export async function execute(interaction) {
       longestStreak: 0,
       totalCompletions: 0,
       lastCompleted: null,
-      completions: [], // Array of completion dates
+      completions: [],
     };
 
     const success = createHabit(userId, guildId, habit);
@@ -133,9 +130,7 @@ export async function execute(interaction) {
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error("Error in habit-create command:", error);
-
     const errorMessage = `There was an error creating your habit: ${error.message}`;
-
     try {
       if (interaction.deferred) {
         await interaction.editReply({ content: errorMessage });
